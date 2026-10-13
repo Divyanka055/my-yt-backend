@@ -1,36 +1,37 @@
 const mongoose = require('mongoose')
 
 const commentSchema = new mongoose.Schema({
-    commentText:{
-        type:String,
-        required:true
+    commentText: {
+        type: String,
+        required: true
     },
-    userId:{
-        type:mongoose.Types.ObjectId,
-        ref:"User"
+    userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
     },
-    videoId:{
-        type:mongoose.Types.ObjectId,
-        ref:"Video"
+    videoId: {
+        type: mongoose.Types.ObjectId,
+        ref: "Video"
     },
-    likes:{
-        type:Number,
-        default:0
+    likes: {
+        type: Number,
+        default: 0
     },
-    likedBy:{
-        type:mongoose.Types.ObjectId,
-        ref:"User"
+    likedBy: {
+        type: mongoose.Types.ObjectId,
+        ref: "User"
     },
-    dislikes:{
-        type:Number,
-        default:0
+    dislikes: {
+        type: Number,
+        default: 0
     },
-    dislikedBy:{
-        type:mongoose.Types.ObjectId,
-        ref:"User"
+    dislikedBy: {
+        type: mongoose.Types.ObjectId,
+        ref: "User"
     }
 },
-{timestamps:true}
+    { timestamps: true }
 )
 
-module.exports = mongoose.model('Comment',commentSchema)
+module.exports = mongoose.model('Comment', commentSchema)

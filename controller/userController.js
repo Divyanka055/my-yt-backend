@@ -143,9 +143,9 @@ const unsubscribe = async (req, res) => {
         const user = await User.findById(tokenData._id)
 
         if (channelId == tokenData._id) {
-            res.status(500).json({
-                error: "You can't unsubscribe yourself!"
-            })
+            return res.status(400).json({
+                error: "You can't subscribe yourself!"
+            });
         }
 
         const channel = await User.findById(channelId)
@@ -155,15 +155,23 @@ const unsubscribe = async (req, res) => {
             })
         }
 
-        if (!channel.subscriber.includes(tokenData._id)) {
-            return res.status(500).json({
+
+        if (
+            !channel.subscriber.some(
+                id => id.toString() === user._id.toString()
+            )
+        ) {
+            return res.status(400).json({
                 error: "Already Unsubscribed..."
-            })
+            });
         }
+        channel.subscriber = channel.subscriber.filter(
+            id => id.toString() !== user._id.toString()
+        );
 
-        channel.subscriber = channel.subscriber.filter(userId => { userId != user._id })
-        user.subscribedTo = user.subscribedTo.filter(userId => { userId != channel._id })
-
+        user.subscribedTo = user.subscribedTo.filter(
+            id => id.toString() !== channel._id.toString()
+        );
         await channel.save()
         await user.save()
 
@@ -187,8 +195,7 @@ const profilePic = async (req, res) => {
 
         const user = await User.findById(tokenData._id)
 
-        if(user.profilPicUrl)
-        {
+        if (user.profilPicUrl) {
             const dest = await cloudinary.uploader.destroy(user.profilPicId)
             console.log("Last image deleted..")
         }
@@ -206,7 +213,7 @@ const profilePic = async (req, res) => {
         console.log(uploadedResult)
 
         user.profilePicId = uploadedResult.public_id,
-        user.profilePicUrl = uploadedResult.secure_url
+            user.profilePicUrl = uploadedResult.secure_url
 
         const result = await user.save()
 
@@ -231,11 +238,10 @@ const coverPic = async (req, res) => {
 
         const user = await User.findById(tokenData._id)
 
-        if(user.coverPicUrl)
-        {
+        if (user.coverPicUrl) {
             const dest = await cloudinary.uploader.destroy(user.coverPicId)
         }
- 
+
         if (!req.files || !req.files.coverPic) {
             return res.status(500).json({
                 error: "File not found!"
@@ -246,7 +252,7 @@ const coverPic = async (req, res) => {
             folder: '/youtube/coverPics'
         })
 
-            user.coverPicId = uploadedResult.public_id,
+        user.coverPicId = uploadedResult.public_id,
             user.coverPicUrl = uploadedResult.secure_url
 
         const result = await user.save()
@@ -265,30 +271,27 @@ const coverPic = async (req, res) => {
 }
 
 
-const findChannel = async(req,res)=>{
-    try
-    {
+const findChannel = async (req, res) => {
+    try {
         console.log(req.params.channelId)
         const channelId = req.params.channelId
 
         const channel = await User.findById(channelId)
 
-        if(!channel)
-        {
+        if (!channel) {
             return res.status(500).json({
-                errorMsg:"Channel not foud"
+                errorMsg: "Channel not foud"
             })
         }
 
         res.status(200).json({
-            channelDetails:channel
+            channelDetails: channel
         })
     }
-    catch(err)
-    {
+    catch (err) {
         console.log(err)
         res.status(500).json({
-            error:err
+            error: err
         })
     }
 }
