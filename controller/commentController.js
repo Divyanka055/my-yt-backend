@@ -18,42 +18,54 @@ const addComment = async (req, res) => {
             videoId: videoId,
             userId: userId
         })
-    
-
-    await comment.save()
-
-    res.status(200).json({
-        comment: comment
-    })
-
-}
-    catch (err) {
-    console.log(err)
-    res.status(500).json({
-        error: err
-    })
-}
-}
 
 
-const getAllComment = async (req, res) => {
-    try {
-        const videoId = req.params.videoId
-
-        const comments = await Comment.find({ videoId: videoId })
-            .populate('userId', 'channelName profilePicUrl')
+        await comment.save()
 
         res.status(200).json({
-            comments: comments
+            comment: comment
         })
+
     }
     catch (err) {
         console.log(err)
         res.status(500).json({
-            error: err.message
+            error: err
         })
     }
 }
+
+
+
+const getAllComment = async (req, res) => {
+    try {
+        const videoId = req.params.videoId;
+
+        const comments = await Comment.find({ videoId })
+            .populate({
+                path: 'userId',
+                select: 'channelName profilePicUrl'
+            });
+
+        console.log(
+            comments.map(comment => ({
+                commentText: comment.commentText,
+                userId: comment.userId
+            }))
+        );
+
+        res.status(200).json({
+            comments: comments
+        });
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({
+            error: err.message
+        });
+    }
+};
+
+
 
 
 const like = async (req, res) => {
