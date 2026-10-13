@@ -91,12 +91,16 @@ const subscriber = async (req, res) => {
 
         const user = await User.findById(tokenData._id)
 
-        if (channelId == tokenData._id) {
-            res.status(500).json({
-                error: "You can't subscribe yourself!"
-            })
-        }
 
+        if (
+            channel.subscriber.some(
+                id => id.toString() === user._id.toString()
+            )
+        ) {
+            return res.status(400).json({
+                error: "Already Subscribed..."
+            });
+        }
         const channel = await User.findById(channelId)
         if (!channel) {
             return res.status(500).json({
@@ -122,11 +126,13 @@ const subscriber = async (req, res) => {
         })
 
     }
+
     catch (err) {
-        console.log(err)
-        res.status(500).json({
-            error: err
-        })
+        console.error("SUBSCRIBE ERROR:", err);
+
+        return res.status(500).json({
+            error: err.message
+        });
     }
 }
 
