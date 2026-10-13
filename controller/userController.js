@@ -142,25 +142,22 @@ const subscriber = async (req, res) => {
 
 const unsubscribe = async (req, res) => {
     try {
-        const channelId = req.params.channelId
-        const token = req.headers.authorization.split(" ")[1]
-        const tokenData = jwt.verify(token, process.env.SEC_KEY)
 
-        const user = await User.findById(tokenData._id)
+        const user = await User.findById(tokenData._id);
 
-        if (channelId == tokenData._id) {
-            return res.status(400).json({
-                error: "You can't subscribe yourself!"
+        const channel = await User.findById(channelId);
+
+        if (!channel) {
+            return res.status(404).json({
+                error: "Channel not found!"
             });
         }
 
-        const channel = await User.findById(channelId)
-        if (!channel) {
-            return res.status(500).json({
-                error: "Channel not found!"
-            })
+        if (channelId == tokenData._id) {
+            return res.status(400).json({
+                error: "You can't unsubscribe yourself!"
+            });
         }
-
 
         if (
             !channel.subscriber.some(
@@ -171,6 +168,7 @@ const unsubscribe = async (req, res) => {
                 error: "Already Unsubscribed..."
             });
         }
+
         channel.subscriber = channel.subscriber.filter(
             id => id.toString() !== user._id.toString()
         );
@@ -178,131 +176,131 @@ const unsubscribe = async (req, res) => {
         user.subscribedTo = user.subscribedTo.filter(
             id => id.toString() !== channel._id.toString()
         );
-        await channel.save()
-        await user.save()
 
-        res.status(200).json({
-            success: "Unubscribed"
-        })
+        await channel.save();
+        await user.save();
 
+        return res.status(200).json({
+            success: "Unsubscribed"
+        });
     }
     catch (err) {
-        console.log(err)
-        res.status(500).json({
-            error: err
-        })
+            console.log(err)
+            res.status(500).json({
+                error: err
+            })
+        }
     }
-}
 
 const profilePic = async (req, res) => {
-    try {
-        const token = req.headers.authorization.split(" ")[1]
-        const tokenData = jwt.verify(token, process.env.SEC_KEY)
+        try {
+            const token = req.headers.authorization.split(" ")[1]
+            const tokenData = jwt.verify(token, process.env.SEC_KEY)
 
-        const user = await User.findById(tokenData._id)
+            const user = await User.findById(tokenData._id)
 
-        if (user.profilPicUrl) {
-            const dest = await cloudinary.uploader.destroy(user.profilPicId)
-            console.log("Last image deleted..")
-        }
+            if (user.profilPicUrl) {
+                const dest = await cloudinary.uploader.destroy(user.profilPicId)
+                console.log("Last image deleted..")
+            }
 
-        if (!req.files || !req.files.profilePic) {
-            return res.status(500).json({
-                error: "File not found!"
+            if (!req.files || !req.files.profilePic) {
+                return res.status(500).json({
+                    error: "File not found!"
+                })
+            }
+
+            const uploadedResult = await cloudinary.uploader.upload(req.files.profilePic.tempFilePath, {
+                folder: '/youtube/profilePics'
+            })
+
+            console.log(uploadedResult)
+
+            user.profilePicId = uploadedResult.public_id,
+                user.profilePicUrl = uploadedResult.secure_url
+
+            const result = await user.save()
+
+            res.status(200).json({
+                success: "Profile image uploaded successfully...",
+                user: user
             })
         }
-
-        const uploadedResult = await cloudinary.uploader.upload(req.files.profilePic.tempFilePath, {
-            folder: '/youtube/profilePics'
-        })
-
-        console.log(uploadedResult)
-
-        user.profilePicId = uploadedResult.public_id,
-            user.profilePicUrl = uploadedResult.secure_url
-
-        const result = await user.save()
-
-        res.status(200).json({
-            success: "Profile image uploaded successfully...",
-            user: user
-        })
-    }
-    catch (err) {
-        console.log(err)
-        res.status(500).json({
-            error: err
-        })
-    }
-}
-
-
-const coverPic = async (req, res) => {
-    try {
-        const token = req.headers.authorization.split(" ")[1]
-        const tokenData = jwt.verify(token, process.env.SEC_KEY)
-
-        const user = await User.findById(tokenData._id)
-
-        if (user.coverPicUrl) {
-            const dest = await cloudinary.uploader.destroy(user.coverPicId)
-        }
-
-        if (!req.files || !req.files.coverPic) {
-            return res.status(500).json({
-                error: "File not found!"
+        catch (err) {
+            console.log(err)
+            res.status(500).json({
+                error: err
             })
         }
-
-        const uploadedResult = await cloudinary.uploader.upload(req.files.coverPic.tempFilePath, {
-            folder: '/youtube/coverPics'
-        })
-
-        user.coverPicId = uploadedResult.public_id,
-            user.coverPicUrl = uploadedResult.secure_url
-
-        const result = await user.save()
-
-        res.status(200).json({
-            success: "Profile image uploaded successfully...",
-            user: user
-        })
     }
-    catch (err) {
-        console.log(err)
-        res.status(500).json({
-            error: err
-        })
-    }
-}
 
 
-const findChannel = async (req, res) => {
-    try {
-        console.log(req.params.channelId)
-        const channelId = req.params.channelId
+    const coverPic = async (req, res) => {
+        try {
+            const token = req.headers.authorization.split(" ")[1]
+            const tokenData = jwt.verify(token, process.env.SEC_KEY)
 
-        const channel = await User.findById(channelId)
+            const user = await User.findById(tokenData._id)
 
-        if (!channel) {
-            return res.status(500).json({
-                errorMsg: "Channel not foud"
+            if (user.coverPicUrl) {
+                const dest = await cloudinary.uploader.destroy(user.coverPicId)
+            }
+
+            if (!req.files || !req.files.coverPic) {
+                return res.status(500).json({
+                    error: "File not found!"
+                })
+            }
+
+            const uploadedResult = await cloudinary.uploader.upload(req.files.coverPic.tempFilePath, {
+                folder: '/youtube/coverPics'
+            })
+
+            user.coverPicId = uploadedResult.public_id,
+                user.coverPicUrl = uploadedResult.secure_url
+
+            const result = await user.save()
+
+            res.status(200).json({
+                success: "Profile image uploaded successfully...",
+                user: user
             })
         }
-
-        res.status(200).json({
-            channelDetails: channel
-        })
+        catch (err) {
+            console.log(err)
+            res.status(500).json({
+                error: err
+            })
+        }
     }
-    catch (err) {
-        console.log(err)
-        res.status(500).json({
-            error: err
-        })
+
+
+    const findChannel = async (req, res) => {
+        try {
+            console.log(req.params.channelId)
+            const channelId = req.params.channelId
+
+            const channel = await User.findById(channelId)
+
+            if (!channel) {
+                return res.status(500).json({
+                    errorMsg: "Channel not foud"
+                })
+            }
+
+            res.status(200).json({
+                channelDetails: channel
+            })
+        }
+        catch (err) {
+            console.log(err)
+            res.status(500).json({
+                error: err
+            })
+        }
     }
-}
 
 
 
 
-module.exports = { signup, login, subscriber, unsubscribe, profilePic, coverPic, findChannel };
+    module.exports = { signup, login, subscriber, unsubscribe, profilePic, coverPic, findChannel };
