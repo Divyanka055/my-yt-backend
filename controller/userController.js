@@ -84,13 +84,38 @@ const login = async (req, res) => {
 
 const subscriber = async (req, res) => {
     try {
-        const channelId = req.params.channelId
-        const token = req.headers.authorization.split(" ")[1]
-        const tokenData = jwt.verify(token, process.env.SEC_KEY)
-        console.log(tokenData)
+        const token = req.headers.authorization?.split(" ")[1];
 
-        const user = await User.findById(tokenData._id)
+        if (!token) {
+            return res.status(401).json({
+                error: "Please login first"
+            });
+        }
 
+        const tokenData = jwt.verify(token, process.env.SEC_KEY);
+
+        const channelId = req.params.channelId;
+
+        const user = await User.findById(tokenData._id);
+        const channel = await User.findById(channelId);
+
+        if (!user) {
+            return res.status(404).json({
+                error: "User not found"
+            });
+        }
+
+        if (!channel) {
+            return res.status(404).json({
+                error: "Channel not found"
+            });
+        }
+
+        if (user._id.toString() === channel._id.toString()) {
+            return res.status(400).json({
+                error: "You can't subscribe to your own channel"
+            });
+        }
 
         if (
             channel.subscriber.some(
@@ -98,43 +123,38 @@ const subscriber = async (req, res) => {
             )
         ) {
             return res.status(400).json({
-                error: "Already Subscribed..."
+                error: "Already Subscribed"
             });
         }
-        const channel = await User.findById(channelId)
-        if (!channel) {
-            return res.status(500).json({
-                error: "Channel not found!"
-            })
+
+        channel.subscriber.push(user._id);
+
+        if (
+            !user.subscribedTo.some(
+                id => id.toString() === channel._id.toString()
+            )
+        ) {
+            user.subscribedTo.push(channel._id);
         }
 
-        if (channel.subscriber.includes(tokenData._id)) {
-            return res.status(500).json({
-                error: "Already Subscribed..."
-            })
-        }
+        await channel.save();
+        await user.save();
 
+        return res.status(200).json({
+            success: "Subscribed",
+            subscriberCount: channel.subscriber.length
+        });
 
-        channel.subscriber.push(user._id)
-        user.subscribedTo.push(channel._id)
-
-        await channel.save()
-        await user.save()
-
-        res.status(200).json({
-            success: "Subscribed"
-        })
-
-    }
-
-    catch (err) {
+    } catch (err) {
         console.error("SUBSCRIBE ERROR:", err);
 
         return res.status(500).json({
             error: err.message
         });
     }
-}
+};
+
+
 
 
 
@@ -142,30 +162,45 @@ const subscriber = async (req, res) => {
 
 const unsubscribe = async (req, res) => {
     try {
+        const token = req.headers.authorization?.split(" ")[1];
 
-        const user = await User.findById(tokenData._id);
-
-        const channel = await User.findById(channelId);
-
-        if (!channel) {
-            return res.status(404).json({
-                error: "Channel not found!"
+        if (!token) {
+            return res.status(401).json({
+                error: "Please login first"
             });
         }
 
-        if (channelId == tokenData._id) {
+        const tokenData = jwt.verify(token, process.env.SEC_KEY);
+        const channelId = req.params.channelId;
+
+        const user = await User.findById(tokenData._id);
+        const channel = await User.findById(channelId);
+
+        if (!user) {
+            return res.status(404).json({
+                error: "User not found"
+            });
+        }
+
+        if (!channel) {
+            return res.status(404).json({
+                error: "Channel not found"
+            });
+        }
+
+        if (user._id.toString() === channel._id.toString()) {
             return res.status(400).json({
                 error: "You can't unsubscribe yourself!"
             });
         }
 
-        if (
-            !channel.subscriber.some(
-                id => id.toString() === user._id.toString()
-            )
-        ) {
+        const isSubscribed = channel.subscriber.some(
+            id => id.toString() === user._id.toString()
+        );
+
+        if (!isSubscribed) {
             return res.status(400).json({
-                error: "Already Unsubscribed..."
+                error: "You are not subscribed to this channel"
             });
         }
 
@@ -181,126 +216,129 @@ const unsubscribe = async (req, res) => {
         await user.save();
 
         return res.status(200).json({
-            success: "Unsubscribed"
+            success: "Unsubscribed",
+            subscriberCount: channel.subscriber.length
+        });
+
+    } catch (err) {
+        console.error("UNSUBSCRIBE ERROR:", err);
+
+        return res.status(500).json({
+            error: err.message
         });
     }
-    catch (err) {
-            console.log(err)
-            res.status(500).json({
-                error: err
-            })
-        }
-    }
+};
+
 
 const profilePic = async (req, res) => {
-        try {
-            const token = req.headers.authorization.split(" ")[1]
-            const tokenData = jwt.verify(token, process.env.SEC_KEY)
+    try {
+        const token = req.headers.authorization.split(" ")[1]
+        const tokenData = jwt.verify(token, process.env.SEC_KEY)
 
-            const user = await User.findById(tokenData._id)
+        const user = await User.findById(tokenData._id)
 
-            if (user.profilPicUrl) {
-                const dest = await cloudinary.uploader.destroy(user.profilPicId)
-                console.log("Last image deleted..")
-            }
+        if (user.profilPicUrl) {
+            const dest = await cloudinary.uploader.destroy(user.profilPicId)
+            console.log("Last image deleted..")
+        }
 
-            if (!req.files || !req.files.profilePic) {
-                return res.status(500).json({
-                    error: "File not found!"
-                })
-            }
-
-            const uploadedResult = await cloudinary.uploader.upload(req.files.profilePic.tempFilePath, {
-                folder: '/youtube/profilePics'
-            })
-
-            console.log(uploadedResult)
-
-            user.profilePicId = uploadedResult.public_id,
-                user.profilePicUrl = uploadedResult.secure_url
-
-            const result = await user.save()
-
-            res.status(200).json({
-                success: "Profile image uploaded successfully...",
-                user: user
+        if (!req.files || !req.files.profilePic) {
+            return res.status(500).json({
+                error: "File not found!"
             })
         }
-        catch (err) {
-            console.log(err)
-            res.status(500).json({
-                error: err
-            })
-        }
+
+        const uploadedResult = await cloudinary.uploader.upload(req.files.profilePic.tempFilePath, {
+            folder: '/youtube/profilePics'
+        })
+
+        console.log(uploadedResult)
+
+        user.profilePicId = uploadedResult.public_id,
+            user.profilePicUrl = uploadedResult.secure_url
+
+        const result = await user.save()
+
+        res.status(200).json({
+            success: "Profile image uploaded successfully...",
+            user: user
+        })
     }
-
-
-    const coverPic = async (req, res) => {
-        try {
-            const token = req.headers.authorization.split(" ")[1]
-            const tokenData = jwt.verify(token, process.env.SEC_KEY)
-
-            const user = await User.findById(tokenData._id)
-
-            if (user.coverPicUrl) {
-                const dest = await cloudinary.uploader.destroy(user.coverPicId)
-            }
-
-            if (!req.files || !req.files.coverPic) {
-                return res.status(500).json({
-                    error: "File not found!"
-                })
-            }
-
-            const uploadedResult = await cloudinary.uploader.upload(req.files.coverPic.tempFilePath, {
-                folder: '/youtube/coverPics'
-            })
-
-            user.coverPicId = uploadedResult.public_id,
-                user.coverPicUrl = uploadedResult.secure_url
-
-            const result = await user.save()
-
-            res.status(200).json({
-                success: "Profile image uploaded successfully...",
-                user: user
-            })
-        }
-        catch (err) {
-            console.log(err)
-            res.status(500).json({
-                error: err
-            })
-        }
+    catch (err) {
+        console.log(err)
+        res.status(500).json({
+            error: err
+        })
     }
+}
 
 
-    const findChannel = async (req, res) => {
-        try {
-            console.log(req.params.channelId)
-            const channelId = req.params.channelId
+const coverPic = async (req, res) => {
+    try {
+        const token = req.headers.authorization.split(" ")[1]
+        const tokenData = jwt.verify(token, process.env.SEC_KEY)
 
-            const channel = await User.findById(channelId)
+        const user = await User.findById(tokenData._id)
 
-            if (!channel) {
-                return res.status(500).json({
-                    errorMsg: "Channel not foud"
-                })
-            }
+        if (user.coverPicUrl) {
+            const dest = await cloudinary.uploader.destroy(user.coverPicId)
+        }
 
-            res.status(200).json({
-                channelDetails: channel
+        if (!req.files || !req.files.coverPic) {
+            return res.status(500).json({
+                error: "File not found!"
             })
         }
-        catch (err) {
-            console.log(err)
-            res.status(500).json({
-                error: err
-            })
-        }
+
+        const uploadedResult = await cloudinary.uploader.upload(req.files.coverPic.tempFilePath, {
+            folder: '/youtube/coverPics'
+        })
+
+        user.coverPicId = uploadedResult.public_id,
+            user.coverPicUrl = uploadedResult.secure_url
+
+        const result = await user.save()
+
+        res.status(200).json({
+            success: "Profile image uploaded successfully...",
+            user: user
+        })
     }
+    catch (err) {
+        console.log(err)
+        res.status(500).json({
+            error: err
+        })
+    }
+}
+
+
+const findChannel = async (req, res) => {
+    try {
+        console.log(req.params.channelId)
+        const channelId = req.params.channelId
+
+        const channel = await User.findById(channelId)
+
+        if (!channel) {
+            return res.status(500).json({
+                errorMsg: "Channel not foud"
+            })
+        }
+
+        res.status(200).json({
+            channelDetails: channel
+        })
+    }
+    catch (err) {
+        console.log(err)
+        res.status(500).json({
+            error: err
+        })
+    }
+}
 
 
 
 
-    module.exports = { signup, login, subscriber, unsubscribe, profilePic, coverPic, findChannel };
+module.exports = { signup, login, subscriber, unsubscribe, profilePic, coverPic, findChannel };
