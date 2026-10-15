@@ -46,7 +46,7 @@ const upload = async (req, res) => {
             thumbnailUrl: thumbnailUrl,
             uploadedBy: userId,
             tags: JSON.parse(req.body.tags),
-            category:req.body.category
+            category: req.body.category
         })
 
         const uploadedVideo = await video.save()
@@ -65,238 +65,241 @@ const upload = async (req, res) => {
 }
 
 
-const like = async(req,res)=>{
-    try
-    {
-        const token = req.headers.authorization.split(" ")[1]
-        const tokenData = jwt.verify(token, process.env.SEC_KEY)
 
-        const videoId = req.params.videoId
+const like = async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
 
-        const video = await Video.findById(videoId)
-
-        if(!video)
-        {
-            return res.status(500).json({
-                error:"Video not found"
-            })
-        }
-        
-        if(video.likedBy.includes(tokenData._id))
-        {
-           video.likes -= 1,
-           video.likedBy = video.likedBy.filter(userId => userId != tokenData._id)
-
-           await video.save()
-
-           return res.status(500).json({
-            likes:video.likes,
-            video:video
-           })
+        if (!authHeader) {
+            return res.status(401).json({ error: "Please login first" });
         }
 
+        const token = authHeader.split(" ")[1];
+        const tokenData = jwt.verify(token, process.env.SEC_KEY);
+        const userId = String(tokenData._id);
 
-        if(video.dislikedBy.includes(tokenData._id))
-        {
-           video.dislikes -= 1,
-           video.dislikedBy = video.dislikedBy.filter(userId => userId != tokenData._id)
+        const video = await Video.findById(req.params.videoId);
+
+        if (!video) {
+            return res.status(404).json({ error: "Video not found" });
         }
 
-           video.likes += 1,
-           video.likedBy.push(tokenData._id)
+        const alreadyLiked = video.likedBy.some(
+            id => String(id) === userId
+        );
 
-           await video.save()
+        if (alreadyLiked) {
+            video.likedBy = video.likedBy.filter(
+                id => String(id) !== userId
+            );
+            video.likes = Math.max(0, video.likes - 1);
 
-           res.status(200).json({
-            likes : video.likes,
-            video:video
-           })
+            await video.save();
 
-    }
-    catch(err)
-    {
-        console.log(err)
-        res.status(500).json({
-            error:err
-        })
-    }
-}
-
-
-
-
-const unlike = async(req,res)=>{
-    try
-    {
-        const token = req.headers.authorization.split(" ")[1]
-        const tokenData = jwt.verify(token, process.env.SEC_KEY)
-
-        const videoId = req.params.videoId
-
-        const video = await Video.findById(videoId)
-
-        if(!video)
-        {
-            return res.status(500).json({
-                error:"Video not found"
-            })
-        }
-        
-        if(video.dislikedBy.includes(tokenData._id))
-        {
-           video.dislikes -= 1,
-           video.dislikedBy = video.dislikedBy.filter(userId => userId != tokenData._id)
-
-           await video.save()
-
-           return res.status(500).json({
-            dislikes:video.dislikes,
-            video:video
-           })
+            return res.status(200).json({
+                likes: video.likes,
+                video
+            });
         }
 
+        const alreadyDisliked = video.dislikedBy.some(
+            id => String(id) === userId
+        );
 
-        if(video.likedBy.includes(tokenData._id))
-        {
-           video.likes -= 1,
-           video.likedBy = video.likedBy.filter(userId => userId != tokenData._id)
+        if (alreadyDisliked) {
+            video.dislikedBy = video.dislikedBy.filter(
+                id => String(id) !== userId
+            );
+            video.dislikes = Math.max(0, video.dislikes - 1);
         }
 
-           video.dislikes += 1,
-           video.dislikedBy.push(tokenData._id)
+        video.likedBy.push(tokenData._id);
+        video.likes += 1;
 
-           await video.save()
+        await video.save();
 
-           res.status(200).json({
-            dislikes : video.dislikes,
-            video:video
-           })
-
-    }
-    catch(err)
-    {
-        console.log(err)
-        res.status(500).json({
-            error:err
-        })
-    }
-}
-
-const videoById = async(req,res)=>{
-    try
-    {
-       const video = await Video.findById(req.params.videoId).populate('uploadedBy','_id channelName profilePicUrl subscriber')
-
-       if(!video)
-       {
+        return res.status(200).json({
+            likes: video.likes,
+            video
+        });
+    } catch (err) {
+        console.log("LIKE CONTROLLER ERROR:", err);
         return res.status(500).json({
-            msg:"Video not found!"
-        })
-       }
-
-       console.log(video.views)
-       video.views += 1;
-
-       await video.save()
-
-       res.status(200).json({
-        video:video
-       })
+            error: err.message
+        });
     }
-    catch(err)
-    {
+};
+
+
+const unlike = async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+
+        if (!authHeader) {
+            return res.status(401).json({ error: "Please login first" });
+        }
+
+        const token = authHeader.split(" ")[1];
+        const tokenData = jwt.verify(token, process.env.SEC_KEY);
+        const userId = String(tokenData._id);
+
+        const video = await Video.findById(req.params.videoId);
+
+        if (!video) {
+            return res.status(404).json({ error: "Video not found" });
+        }
+
+        const alreadyDisliked = video.dislikedBy.some(
+            id => String(id) === userId
+        );
+
+        if (alreadyDisliked) {
+            video.dislikedBy = video.dislikedBy.filter(
+                id => String(id) !== userId
+            );
+            video.dislikes = Math.max(0, video.dislikes - 1);
+
+            await video.save();
+
+            return res.status(200).json({
+                dislikes: video.dislikes,
+                video
+            });
+        }
+
+        const alreadyLiked = video.likedBy.some(
+            id => String(id) === userId
+        );
+
+        if (alreadyLiked) {
+            video.likedBy = video.likedBy.filter(
+                id => String(id) !== userId
+            );
+            video.likes = Math.max(0, video.likes - 1);
+        }
+
+        video.dislikedBy.push(tokenData._id);
+        video.dislikes += 1;
+
+        await video.save();
+
+        return res.status(200).json({
+            dislikes: video.dislikes,
+            video
+        });
+    } catch (err) {
+        console.log("DISLIKE CONTROLLER ERROR:", err);
+        return res.status(500).json({
+            error: err.message
+        });
+    }
+};
+
+
+
+const videoById = async (req, res) => {
+    try {
+        const video = await Video.findById(req.params.videoId).populate('uploadedBy', '_id channelName profilePicUrl subscriber')
+
+        if (!video) {
+            return res.status(500).json({
+                msg: "Video not found!"
+            })
+        }
+
+        console.log(video.views)
+        video.views += 1;
+
+        await video.save()
+
+        res.status(200).json({
+            video: video
+        })
+    }
+    catch (err) {
         console.log(err)
         res.status(500).json({
-            error:err
+            error: err
         })
     }
 }
 
-const allVideo = async(req,res)=>{
-    try
-    {
+const allVideo = async (req, res) => {
+    try {
         console.log("hello")
-        const videos = await Video.find().populate('uploadedBy','channelName profilePicUrl')
+        const videos = await Video.find().populate('uploadedBy', 'channelName profilePicUrl')
         console.log(videos)
         res.status(200).json({
-            videos:videos
-        })   
+            videos: videos
+        })
     }
-    catch(err)
-    {
+    catch (err) {
         console.log(err)
         res.status(500).json({
-            error:err
+            error: err
         })
     }
 }
 
-const videosByChannelId = async(req,res)=>{
-    try
-    {
-       const videos = await Video.findById(req.params.channelid)
+const videosByChannelId = async (req, res) => {
+    try {
+        const videos = await Video.findById(req.params.channelid)
 
-       if(!videos)
-       {
-        return res.status(500).json({
-            msg:"Videos not found!"
-        })
-       }
-
-       res.status(200).json({
-        videos:videos
-       })
-    }
-    catch(err)
-    {
-        console.log(err)
-        res.status(500).json({
-            error:err
-        })
-    }
-}
-
-const deleteVideo = async(req,res)=>{
-    try
-    {
-        const token = req.headers.authorization.split(" ")[1]
-        const tokenData = jwt.verify(token, process.env.SEC_KEY)
-
-        const videoId = req.params.videoId  
-        const video = await Video.findById(req.params.videoId)
-
-        if(!video)
-        {
-            return res.status(200).json({
-                msg:"Video not found!"
+        if (!videos) {
+            return res.status(500).json({
+                msg: "Videos not found!"
             })
         }
 
-        if(video.uploadedBy != tokenData._id)
-        {
+        res.status(200).json({
+            videos: videos
+        })
+    }
+    catch (err) {
+        console.log(err)
+        res.status(500).json({
+            error: err
+        })
+    }
+}
+
+const deleteVideo = async (req, res) => {
+    try {
+        const token = req.headers.authorization.split(" ")[1]
+        const tokenData = jwt.verify(token, process.env.SEC_KEY)
+
+        const videoId = req.params.videoId
+        const video = await Video.findById(req.params.videoId)
+
+        if (!video) {
             return res.status(200).json({
-                error:"Invalid user",
-                msg:"You can't delete this video"
+                msg: "Video not found!"
+            })
+        }
+
+        if (video.uploadedBy != tokenData._id) {
+            return res.status(200).json({
+                error: "Invalid user",
+                msg: "You can't delete this video"
             })
         }
 
         await cloudinary.uploader.destroy(video.videoId)
         await cloudinary.uploader.destroy(video.thumbnailId)
-        
-        await Video.deleteOne({_id:video._id})
+
+        await Video.deleteOne({ _id: video._id })
         res.status(200).json({
-            msg:"Video Deleted.."
+            msg: "Video Deleted.."
         })
 
     }
-    catch(err)
-    {
+    catch (err) {
         console.log(err)
         res.status(500).json({
-            error:err
+            error: err
         })
     }
 }
 
 
-module.exports = { upload, like, unlike, videoById, allVideo, videosByChannelId, deleteVideo}
+module.exports = { upload, like, unlike, videoById, allVideo, videosByChannelId, deleteVideo }
